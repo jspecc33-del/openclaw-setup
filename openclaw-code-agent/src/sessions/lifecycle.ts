@@ -93,6 +93,16 @@ export class SessionLifecycle {
     adapter.onOutput((chunk: string) => {
       buffer.write(chunk);
       this.store.appendOutput(session.id, chunk);
+      // Persist the Claude session ID as soon as the harness captures it.
+      if (adapter.type === "claude-code") {
+        const ccAdapter = adapter as import("../harness/claude-code").ClaudeCodeHarness;
+        const claudeId = ccAdapter.getClaudeSessionId();
+        if (claudeId && this.store.get(session.id)?.metadata?.claudeSessionId !== claudeId) {
+          this.store.update(session.id, {
+            metadata: { ...this.store.get(session.id)?.metadata, claudeSessionId: claudeId },
+          });
+        }
+      }
     });
 
     adapter.onExit((code: number | null, _signal: string | null) => {
