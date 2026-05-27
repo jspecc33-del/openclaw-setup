@@ -1,0 +1,24 @@
+{
+  "name": "openclaw-code-agent",
+  "version": "1.0.0",
+  "description": "Managed background coding sessions for Claude Code and Codex",
+  "type": "module",
+  "main": "dist/plugin.js",
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.4.21"
+  },
+  "dependencies": {
+    "uuid": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/uuid": "^9.0.0",
+    "typescript": "^5.3.0"
+  },
+  "license": "MIT",
+  "keywords": ["openclaw", "plugin", "claude-code", "codex", "agent"]
+}
