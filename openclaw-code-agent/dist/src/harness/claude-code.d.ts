@@ -3,42 +3,48 @@ import type { Session } from "../types";
 import type { PluginConfig } from "../types";
 /**
  * Harness adapter for Claude Code CLI.
- * Spawns and controls the `claude` process in either interactive
- * or prompt mode, with plan detection from output markers.
+ *
+ * Spawn model:
+ *   - One-shot:    claude -p "<instructions>" --cwd <dir> --allowedTools <tools>
+ *   - Interactive: claude --cwd <dir> --allowedTools <tools>  (stdin/stdout pipes)
+ *   - Resume:      claude --resume <sessionId> -p "<message>" --cwd <dir>
+ *
+ * Claude emits its session UUID on stderr.  We capture it so every subsequent
+ * call (respond / resume) can pass --resume <id> for true session continuity.
  */
 export declare class ClaudeCodeHarness extends HarnessAdapter {
     readonly type: "claude-code";
+    private claudeSessionId?;
+    private stderrBuffer;
     constructor(session: Session, config: PluginConfig);
-    /**
-     * Start the Claude Code process.
-     * If instructions are provided, runs in one-shot prompt mode.
-     * Otherwise, spawns an interactive session with stdin/stdout pipes.
-     */
     start(instructions?: string): Promise<void>;
-    /** Send a message to the interactive Claude Code session. */
+    /** Send a follow-up message, reusing the existing Claude session via --resume. */
     send(message: string): Promise<void>;
-    /** Stop the Claude Code process. */
     stop(signal?: NodeJS.Signals): Promise<void>;
-    /**
-     * Resume a previously suspended session.
-     * Claude Code does not have a true resume mechanism through this adapter,
-     * so we re-spawn. Future versions may support `claude --resume <sessionId>`.
-     */
+    /** Resume a suspended session using --resume <sessionId> if available. */
     resume(): Promise<void>;
-    /** Check if the Claude Code process is running. */
     getStatus(): Promise<{
         running: boolean;
         pid?: number;
         exitCode?: number;
     }>;
-    /**
-     * Detect a plan artifact within an output chunk.
-     * Looks for --- PLAN BEGIN --- ... --- PLAN END --- markers.
-     */
+    /** The Claude session UUID extracted from stderr (available after first output). */
+    getClaudeSessionId(): string | undefined;
+    /** Detect a plan artifact within an output chunk (--- PLAN BEGIN/END --- markers). */
     detectPlan(outputChunk: string): string | undefined;
-    /** Build the environment variables for the Claude Code process. */
+    /**
+     * Spawn a new one-shot `claude --resume <sessionId>` process.
+     * This is the session-continuity pattern from the Claude Code CLI docs:
+     *   claude --resume <uuid> -p "<message>" --cwd <dir>
+     */
+    private spawnResume;
+    /**
+     * Extract the Claude session UUID from stderr.
+     * Claude prints the UUID on stderr; we keep the last match seen so the
+     * stored ID stays current after each resumed turn.
+     */
+    private extractSessionId;
     private buildEnv;
-    /** Attach stdout, stderr, and exit listeners to the process. */
     private attachListeners;
 }
 //# sourceMappingURL=claude-code.d.ts.map
