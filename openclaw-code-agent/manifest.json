@@ -2,7 +2,7 @@
   "name": "openclaw-code-agent",
   "version": "1.0.0",
   "description": "Managed background coding sessions for Claude Code and Codex",
-  "entry": "dist/plugin.js",
+  "entry": "dist/src/plugin.js",
   "contracts": {
     "tools": [
       "agent_launch",

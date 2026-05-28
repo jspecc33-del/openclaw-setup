@@ -24,6 +24,8 @@ export class VerifierGoal extends GoalEngine {
   private store: SessionStore;
   private iterationTimer?: ReturnType<typeof setTimeout>;
   private iterationDelayMs: number = 5000;
+  // Resolved workdir from the launched session (may be a worktree path)
+  private sessionWorkdir?: string;
 
   constructor(lifecycle: SessionLifecycle, store: SessionStore) {
     super();
@@ -45,6 +47,9 @@ export class VerifierGoal extends GoalEngine {
       instructions: task.target,
     });
 
+    // Capture the session's actual workdir (may be an isolated worktree path)
+    this.sessionWorkdir = session.workdir;
+
     // Link the session back to the goal task
     task.sessionId = session.id;
     this.store.update(session.id, { goalTaskId: task.id, state: "active" });
@@ -56,7 +61,7 @@ export class VerifierGoal extends GoalEngine {
   /**
    * One iteration of the verifier loop:
    * 1. Read the latest buffered output from the session.
-   * 2. Run the verifier command in the working directory.
+   * 2. Run the verifier command in the session's working directory.
    * 3. Interpret the exit code and update goal state.
    */
   async iterate(): Promise<void> {
@@ -74,12 +79,13 @@ export class VerifierGoal extends GoalEngine {
       return;
     }
 
-    // Run the verifier command synchronously in the task workdir
+    // Run the verifier command in the session's actual workdir so it tests
+    // the agent's changes rather than the base checkout.
     let output: string;
     let exitCode: number = 0;
     try {
       output = execSync(task.verifierCommand!, {
-        cwd: task.workdir,
+        cwd: this.sessionWorkdir ?? task.workdir,
         encoding: "utf-8",
         timeout: 60000,
       });

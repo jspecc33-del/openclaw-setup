@@ -5,10 +5,7 @@ yarn.lock
 pnpm-lock.yaml
 
 # Build output
-dist/
 build/
-*.js
-!dist/
 
 # Session data (default location)
 /data/
