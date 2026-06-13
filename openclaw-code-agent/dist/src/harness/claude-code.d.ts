@@ -45,6 +45,16 @@ export declare class ClaudeCodeHarness extends HarnessAdapter {
      */
     private extractSessionId;
     private buildEnv;
+    /**
+     * CLI flags derived from `execPolicy`.
+     *
+     * - "allow" (default): pass `--dangerously-skip-permissions` so the
+     *   unattended background session never blocks on a permission prompt.
+     * - "sandbox": omit the flag — Claude Code's normal permission system
+     *   applies, auto-denying any tool not covered by `--allowedTools` since
+     *   there is no TTY to answer prompts.
+     */
+    private execPolicyArgs;
     private attachListeners;
 }
 //# sourceMappingURL=claude-code.d.ts.map

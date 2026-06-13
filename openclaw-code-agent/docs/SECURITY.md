@@ -70,6 +70,22 @@ The plugin operates within these constraints:
 
 ---
 
+## Claude Code `execPolicy`
+
+`harnesses.claudeCode.execPolicy` controls how the Claude Code harness
+handles tool-permission prompts during unattended background sessions:
+
+| Value | Behavior |
+|-------|----------|
+| `"allow"` (default) | Passes `--dangerously-skip-permissions` so the session never blocks on a prompt. Claude Code has full access to every tool, regardless of `allowedTools`. |
+| `"sandbox"` | Omits that flag. Claude Code's normal permission system applies; with no TTY to answer prompts, any tool not covered by `allowedTools` is auto-denied. |
+
+Set `execPolicy: "sandbox"` for untrusted instructions or third-party
+sessions where you want the `allowedTools` whitelist to be a hard ceiling.
+Keep the default `"allow"` only for trusted, fully-automated workflows.
+
+---
+
 ## Recommendations
 
 - Run the OpenClaw host with the **least-privilege user** sufficient for

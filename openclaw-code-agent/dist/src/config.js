@@ -18,7 +18,7 @@ export const DEFAULT_CONFIG = {
     defaultWorktreeStrategy: "delegate",
     harnesses: {
         claudeCode: {
-            allowedTools: ["Read", "Write", "Edit", " Bash"],
+            allowedTools: ["Read", "Write", "Edit", "Bash"],
             execPolicy: "allow",
         },
         codex: {

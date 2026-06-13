@@ -35,7 +35,7 @@ export class ClaudeCodeHarness extends HarnessAdapter {
     const workdir = this.session.workdir;
     const allowedTools = this.config.harnesses.claudeCode.allowedTools ?? [];
 
-    const baseArgs = ["--cwd", workdir];
+    const baseArgs = ["--cwd", workdir, ...this.execPolicyArgs()];
     if (allowedTools.length > 0) {
       baseArgs.push("--allowedTools", allowedTools.join(","));
     }
@@ -128,7 +128,7 @@ export class ClaudeCodeHarness extends HarnessAdapter {
     const workdir = this.session.workdir;
     const allowedTools = this.config.harnesses.claudeCode.allowedTools ?? [];
 
-    const args = ["--resume", this.claudeSessionId, "--cwd", workdir];
+    const args = ["--resume", this.claudeSessionId, "--cwd", workdir, ...this.execPolicyArgs()];
     if (allowedTools.length > 0) {
       args.push("--allowedTools", allowedTools.join(","));
     }
@@ -164,6 +164,20 @@ export class ClaudeCodeHarness extends HarnessAdapter {
 
   private buildEnv(): NodeJS.ProcessEnv {
     return { ...process.env };
+  }
+
+  /**
+   * CLI flags derived from `execPolicy`.
+   *
+   * - "allow" (default): pass `--dangerously-skip-permissions` so the
+   *   unattended background session never blocks on a permission prompt.
+   * - "sandbox": omit the flag — Claude Code's normal permission system
+   *   applies, auto-denying any tool not covered by `--allowedTools` since
+   *   there is no TTY to answer prompts.
+   */
+  private execPolicyArgs(): string[] {
+    const execPolicy = this.config.harnesses.claudeCode.execPolicy ?? "allow";
+    return execPolicy === "allow" ? ["--dangerously-skip-permissions"] : [];
   }
 
   private attachListeners(): void {

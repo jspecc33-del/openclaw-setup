@@ -22,7 +22,7 @@ export const DEFAULT_CONFIG: PluginConfig = {
   defaultWorktreeStrategy: "delegate",
   harnesses: {
     claudeCode: {
-      allowedTools: ["Read", "Write", "Edit", " Bash"],
+      allowedTools: ["Read", "Write", "Edit", "Bash"],
       execPolicy: "allow",
     },
     codex: {
