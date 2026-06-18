@@ -21,7 +21,7 @@ export declare class WorktreeIsolation {
      */
     private sanitizeSessionName;
     /**
-     * Execute a git command via execSync with error handling.
+     * Execute a git command via execFileSync (argument array — no shell interpretation).
      */
     private execGit;
     /**

@@ -1,6 +1,9 @@
 // ============================================================
 // OpenClaw Code Agent — Session Lifecycle
 // ============================================================
+// Manages session launch, suspend, resume, kill, fork, and
+// respond operations. Bridges the store, worktree isolation,
+// and harness adapters.
 import * as fs from "fs";
 import * as path from "path";
 import { OutputBuffer } from "./output-buffer";
@@ -19,9 +22,11 @@ export class SessionLifecycle {
         this.activeHarnesses = new Map();
         this.outputBuffers = new Map();
     }
+    // --- Launch ------------------------------------------------
     async launch(params) {
         const harness = params.harness ?? this.config.defaultHarness;
         const workdir = params.workdir ?? this.config.defaultWorkdir;
+        // 1. Validate workdir exists
         if (!fs.existsSync(workdir)) {
             throw new Error(`Work directory does not exist: ${workdir}`);
         }
@@ -29,6 +34,7 @@ export class SessionLifecycle {
         let worktreePath;
         let worktreeBranch;
         let baseBranch;
+        // 2. Worktree isolation (if strategy is not "off" and dir is a git repo)
         const wtStrategy = params.worktreeStrategy ?? this.config.defaultWorktreeStrategy;
         if (wtStrategy !== "off" && this.worktree.isGitRepo(resolvedWorkdir)) {
             const wt = await this.worktree.create(resolvedWorkdir, params.name);
@@ -36,6 +42,7 @@ export class SessionLifecycle {
             worktreeBranch = wt.branch;
             baseBranch = wt.baseBranch;
         }
+        // 3. Create session record in store
         const session = this.store.create({
             name: params.name,
             harness,
@@ -51,13 +58,16 @@ export class SessionLifecycle {
                 worktreeStrategy: wtStrategy,
             },
         });
+        // 4. Spawn harness adapter
         const adapter = this.harnessFactory(session, this.config);
         this.activeHarnesses.set(session.id, adapter);
+        // 7. Begin output buffering (before start to capture all output)
         const buffer = new OutputBuffer(this.config.sessionOutputBufferSize);
         this.outputBuffers.set(session.id, buffer);
         adapter.onOutput((chunk) => {
             buffer.write(chunk);
             this.store.appendOutput(session.id, chunk);
+            // Persist the Claude session ID as soon as the harness captures it.
             if (adapter.type === "claude-code") {
                 const ccAdapter = adapter;
                 const claudeId = ccAdapter.getClaudeSessionId();
@@ -72,6 +82,7 @@ export class SessionLifecycle {
             this.handleHarnessExit(session.id, code);
         });
         await adapter.start(params.instructions);
+        // 5 & 6. Set state based on permission mode
         if (this.config.permissionMode === "plan") {
             this.store.update(session.id, { state: "awaiting_plan_approval" });
         }
@@ -80,6 +91,7 @@ export class SessionLifecycle {
         }
         return this.store.get(session.id);
     }
+    // --- Suspend -----------------------------------------------
     async suspend(sessionId) {
         const adapter = this.activeHarnesses.get(sessionId);
         if (adapter) {
@@ -87,6 +99,7 @@ export class SessionLifecycle {
         }
         this.store.update(sessionId, { state: "suspended" });
     }
+    // --- Resume ------------------------------------------------
     async resume(sessionId) {
         const session = this.store.get(sessionId);
         if (!session) {
@@ -110,6 +123,7 @@ export class SessionLifecycle {
         await adapter.resume();
         this.store.update(sessionId, { state: "active" });
     }
+    // --- Kill --------------------------------------------------
     async kill(sessionId, reason) {
         const adapter = this.activeHarnesses.get(sessionId);
         if (adapter) {
@@ -130,6 +144,7 @@ export class SessionLifecycle {
         }
         this.store.update(sessionId, patch);
     }
+    // --- Respond -----------------------------------------------
     async respond(sessionId, message) {
         const adapter = this.activeHarnesses.get(sessionId);
         if (!adapter) {
@@ -137,6 +152,7 @@ export class SessionLifecycle {
         }
         await adapter.send(message);
     }
+    // --- Fork --------------------------------------------------
     async fork(fromSessionId, newName) {
         const source = this.store.get(fromSessionId);
         if (!source) {
@@ -152,10 +168,12 @@ export class SessionLifecycle {
             originThreadId: source.originThreadId,
         });
     }
+    // --- Harness exit handler ----------------------------------
     handleHarnessExit(sessionId, code) {
         const session = this.store.get(sessionId);
         if (!session)
             return;
+        // Only transition from active/completing states
         if (session.state !== "active" && session.state !== "completing") {
             this.activeHarnesses.delete(sessionId);
             return;
@@ -173,12 +191,14 @@ export class SessionLifecycle {
         });
         this.activeHarnesses.delete(sessionId);
     }
+    // --- Internal access (for monitor) -------------------------
     getHarness(sessionId) {
         return this.activeHarnesses.get(sessionId);
     }
     getBuffer(sessionId) {
         return this.outputBuffers.get(sessionId);
     }
+    /** Clean up resources for a session. */
     removeHarness(sessionId) {
         this.activeHarnesses.delete(sessionId);
         this.outputBuffers.delete(sessionId);

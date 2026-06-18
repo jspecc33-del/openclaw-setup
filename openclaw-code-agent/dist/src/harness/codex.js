@@ -18,6 +18,11 @@ export class CodexHarness extends HarnessAdapter {
         super(session, config);
         this.appServerUrl = config.harnesses.codex.appServerUrl;
     }
+    /**
+     * Start the Codex harness.
+     * If appServerUrl is configured, uses HTTP API mode.
+     * Otherwise, spawns the `codex` CLI process.
+     */
     async start(instructions) {
         if (this.appServerUrl) {
             await this.startAppServer(instructions);
@@ -26,6 +31,7 @@ export class CodexHarness extends HarnessAdapter {
             await this.startCli(instructions);
         }
     }
+    /** Send a message to the active Codex session. */
     async send(message) {
         if (this.appServerUrl && this.threadId) {
             await this.appServerSend(message);
@@ -40,6 +46,7 @@ export class CodexHarness extends HarnessAdapter {
             throw new Error("Codex session is not running");
         }
     }
+    /** Stop the Codex process or delete the app server thread. */
     async stop(signal = "SIGTERM") {
         if (this.pollTimer) {
             clearInterval(this.pollTimer);
@@ -55,15 +62,18 @@ export class CodexHarness extends HarnessAdapter {
             this.process.kill(signal);
         }
     }
+    /** Resume a Codex session. */
     async resume() {
         if (this.appServerUrl && this.threadId) {
             await this.request("POST", `/threads/${this.threadId}/resume`);
             this.startPolling();
         }
         else {
+            // CLI mode: re-spawn
             await this.start();
         }
     }
+    /** Get the current status of the Codex session. */
     async getStatus() {
         if (this.appServerUrl && this.threadId) {
             try {
@@ -81,6 +91,9 @@ export class CodexHarness extends HarnessAdapter {
             exitCode: this.process?.exitCode ?? undefined,
         };
     }
+    // ---------------------------------------------------------------------------
+    // CLI Mode
+    // ---------------------------------------------------------------------------
     async startCli(instructions) {
         const executable = this.config.harnesses.codex.executablePath || "codex";
         const workdir = this.session.workdir;
@@ -102,13 +115,18 @@ export class CodexHarness extends HarnessAdapter {
         }
         this.attachListeners();
     }
+    // ---------------------------------------------------------------------------
+    // App Server Mode
+    // ---------------------------------------------------------------------------
     async startAppServer(instructions) {
         if (!this.appServerUrl) {
             throw new Error("App Server URL is not configured");
         }
+        // Create a new thread
         const thread = await this.request("POST", "/threads", {});
         this.threadId = thread.id;
         if (instructions) {
+            // Send initial instructions as a turn
             await this.appServerSend(instructions);
         }
         this.startPolling();
@@ -151,6 +169,9 @@ export class CodexHarness extends HarnessAdapter {
             }
         }, 2000);
     }
+    // ---------------------------------------------------------------------------
+    // HTTP helper
+    // ---------------------------------------------------------------------------
     request(method, path, body) {
         return new Promise((resolve, reject) => {
             const url = new URL(path, this.appServerUrl);
@@ -195,6 +216,9 @@ export class CodexHarness extends HarnessAdapter {
             req.end();
         });
     }
+    // ---------------------------------------------------------------------------
+    // Shared helpers
+    // ---------------------------------------------------------------------------
     buildEnv() {
         return {
             ...process.env,

@@ -16,12 +16,14 @@ export class SessionStore {
         this.sessionsFile = path.join(dataDir, "sessions.json");
         this.outputDir = path.join(dataDir, "output");
         this.sessions = new Map();
+        // Ensure directories exist
         if (!fs.existsSync(this.dataDir)) {
             fs.mkdirSync(this.dataDir, { recursive: true });
         }
         if (!fs.existsSync(this.outputDir)) {
             fs.mkdirSync(this.outputDir, { recursive: true });
         }
+        // Load existing sessions if any
         if (fs.existsSync(this.sessionsFile)) {
             try {
                 const raw = fs.readFileSync(this.sessionsFile, "utf-8");
@@ -31,6 +33,7 @@ export class SessionStore {
                 }
             }
             catch {
+                // Corrupt or empty file — start fresh
                 this.sessions = new Map();
                 this.persist();
             }
@@ -39,6 +42,7 @@ export class SessionStore {
             this.persist();
         }
     }
+    // --- CRUD --------------------------------------------------
     create(partial) {
         const id = crypto.randomUUID();
         const now = new Date().toISOString();
@@ -85,6 +89,7 @@ export class SessionStore {
         this.sessions.delete(id);
         this.persist();
     }
+    // --- Output I/O --------------------------------------------
     appendOutput(sessionId, chunk) {
         const filePath = path.join(this.outputDir, `${sessionId}.log`);
         const lines = chunk.split("\n");
@@ -115,6 +120,7 @@ export class SessionStore {
         const content = fs.readFileSync(filePath, "utf-8");
         if (content.length === 0)
             return 0;
+        // Count newline characters to estimate line count
         let count = 0;
         for (let i = 0; i < content.length; i++) {
             if (content[i] === "\n")
@@ -133,6 +139,7 @@ export class SessionStore {
             }
         }
     }
+    // --- Persistence -------------------------------------------
     persist() {
         const obj = {};
         for (const [id, session] of this.sessions) {

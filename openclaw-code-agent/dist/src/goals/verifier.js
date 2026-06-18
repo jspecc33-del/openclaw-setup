@@ -1,6 +1,15 @@
 // =============================================================================
 // Goals — Verifier Engine
 // =============================================================================
+// VerifierGoal implements a "test-until-pass" loop: it launches a coding
+// session, waits for the session to emit output, then runs an external
+// verifier command (e.g. `pnpm test`).
+//
+//  * exit 0  → mark goal completed
+//  * non-zero → feed output back into the session as a follow-up prompt
+//  * maxIterations reached → mark goal failed
+//
+// Section 9.1 of the specification.
 import { execSync } from "node:child_process";
 import { GoalEngine } from "./base";
 export class VerifierGoal extends GoalEngine {
@@ -8,24 +17,44 @@ export class VerifierGoal extends GoalEngine {
     store;
     iterationTimer;
     iterationDelayMs = 5000;
+    // Resolved workdir from the launched session (may be a worktree path)
     sessionWorkdir;
     constructor(lifecycle, store) {
         super();
         this.lifecycle = lifecycle;
         this.store = store;
     }
+    /**
+     * Launch a coding session for the goal task, then enter the iterate loop.
+     */
     async start(task) {
         this.task = task;
         this._status = "running";
-        const session = await this.lifecycle.launch({ name: task.name, workdir: task.workdir, instructions: task.target });
+        // Launch the underlying coding session via the lifecycle manager
+        const session = await this.lifecycle.launch({
+            name: task.name,
+            workdir: task.workdir,
+            instructions: task.target,
+        });
+        // Capture the session's actual workdir (may be an isolated worktree path)
         this.sessionWorkdir = session.workdir;
+        // Link the session back to the goal task
         task.sessionId = session.id;
         this.store.update(session.id, { goalTaskId: task.id, state: "active" });
+        // Begin the first iteration after a short delay to let the session start
         this.iterationTimer = setTimeout(() => this.iterate(), this.iterationDelayMs);
     }
+    /**
+     * One iteration of the verifier loop:
+     * 1. Read the latest buffered output from the session.
+     * 2. Run the verifier command in the session's working directory.
+     * 3. Interpret the exit code and update goal state.
+     */
     async iterate() {
-        if (!this.task || this._status !== "running") return;
+        if (!this.task || this._status !== "running")
+            return;
         const task = this.task;
+        // Guard: do not exceed max iterations
         if (task.currentIteration >= task.maxIterations) {
             this._status = "failed";
             task.state = "failed";
@@ -34,11 +63,18 @@ export class VerifierGoal extends GoalEngine {
             await this.lifecycle.kill(task.sessionId, "max_iterations_reached");
             return;
         }
+        // Run the verifier command in the session's actual workdir so it tests
+        // the agent's changes rather than the base checkout.
         let output;
         let exitCode = 0;
         try {
-            output = execSync(task.verifierCommand, { cwd: this.sessionWorkdir ?? task.workdir, encoding: "utf-8", timeout: 60000 });
-        } catch (err) {
+            output = execSync(task.verifierCommand, {
+                cwd: this.sessionWorkdir ?? task.workdir,
+                encoding: "utf-8",
+                timeout: 60000,
+            });
+        }
+        catch (err) {
             output = err.stdout?.toString() ?? "";
             output += err.stderr?.toString() ?? "";
             exitCode = err.status ?? 1;
@@ -47,17 +83,27 @@ export class VerifierGoal extends GoalEngine {
         task.currentIteration += 1;
         task.updatedAt = new Date().toISOString();
         if (exitCode === 0) {
+            // Verifier passed — goal is complete
             this._status = "completed";
             task.state = "completed";
             task.completedAt = new Date().toISOString();
             await this.lifecycle.kill(task.sessionId, "goal_completed");
-        } else {
+        }
+        else {
+            // Verifier failed — send the output back to the session as a follow-up
             await this.lifecycle.respond(task.sessionId, `Verifier failed (iteration ${task.currentIteration}/${task.maxIterations}):\n\n${output}\n\nPlease fix the issues and try again.`);
+            // Schedule the next iteration
             this.iterationTimer = setTimeout(() => this.iterate(), this.iterationDelayMs);
         }
     }
+    /**
+     * Stop the goal engine and kill the underlying session.
+     */
     async stop() {
-        if (this.iterationTimer) { clearTimeout(this.iterationTimer); this.iterationTimer = undefined; }
+        if (this.iterationTimer) {
+            clearTimeout(this.iterationTimer);
+            this.iterationTimer = undefined;
+        }
         this._status = "stopped";
         if (this.task) {
             this.task.state = "stopped";

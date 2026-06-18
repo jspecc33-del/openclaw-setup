@@ -3,7 +3,7 @@
 // Spec: Section 7.2
 // ============================================================================
 
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import type { Session, WorktreeStrategy } from "../types";
 import { WorktreeIsolation } from "./isolation";
 
@@ -45,15 +45,17 @@ export class WorktreeFollowThrough {
   }
 
   /**
-   * Execute a git command via execSync with error handling.
+   * Execute a git command via execFileSync (argument array — no shell interpretation).
    */
   private execGit(cwd: string, args: string[]): string {
-    const cmd = `git -C "${cwd}" ${args.join(" ")}`;
     try {
-      return execSync(cmd, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim();
+      return execFileSync("git", ["-C", cwd, ...args], {
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+      }).trim();
     } catch (err: any) {
       const stderr = err.stderr?.toString() || "";
-      throw new Error(`Git command failed: ${cmd}\n${stderr}`);
+      throw new Error(`Git command failed: git -C "${cwd}" ${args.join(" ")}\n${stderr}`);
     }
   }
 
@@ -167,8 +169,9 @@ export class WorktreeFollowThrough {
       const prTitle = title || `OpenClaw: ${session.name}`;
       const prBody = body || `Changes from OpenClaw Code Agent session "${session.name}".`;
 
-      const output = execSync(
-        `gh pr create --title "${prTitle.replace(/"/g, '\\"')}" --body "${prBody.replace(/"/g, '\\"')}" --base "${baseBranch}" --head "${worktreeBranch}"`,
+      const output = execFileSync(
+        "gh",
+        ["pr", "create", "--title", prTitle, "--body", prBody, "--base", baseBranch, "--head", worktreeBranch],
         { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }
       ).trim();
 

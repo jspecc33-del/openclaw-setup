@@ -1,6 +1,16 @@
 // =============================================================================
 // Routing — Notification Formatting
 // =============================================================================
+// Format status lines, decision buttons, plan review UI, and aggregate stats
+// for different notification channels (Telegram, Discord, generic).
+//
+// All formatters support a plain-text fallback mode (markdown=false) for
+// channels that do not render rich formatting.
+//
+// Section 11.2 of the specification.
+/**
+ * Format a plan review message with Approve / Revise / Reject actions.
+ */
 export function formatPlanReview(session, plan, markdown = true) {
     const header = markdown
         ? `## Plan Review Required\n\n**Session:** \`${session.name}\`\n**ID:** \`${session.id}\``
@@ -14,6 +24,10 @@ export function formatPlanReview(session, plan, markdown = true) {
         : `\n\nActions: Approve / Revise / Reject`;
     return `${header}${planBlock}${actions}`;
 }
+/**
+ * Format a worktree decision prompt with Merge / Open PR / Later / Discard
+ * actions.
+ */
 export function formatWorktreeDecision(session, markdown = true) {
     const header = markdown
         ? `## Worktree Decision\n\n**Session:** \`${session.name}\`\n**Branch:** \`${session.worktreeBranch ?? "n/a"}\``
@@ -23,15 +37,23 @@ export function formatWorktreeDecision(session, markdown = true) {
         : `\n\nActions: Merge / Open PR / Later / Discard`;
     return `${header}${actions}`;
 }
+/**
+ * Format the canonical completion status for a session.
+ */
 export function formatCompletion(session, markdown = true) {
     const statusIcon = session.state === "completed" ? "✅" : session.state === "failed" ? "❌" : "⚠️";
-    const duration = session.durationMs ? `${Math.round(session.durationMs / 1000)}s` : "unknown";
+    const duration = session.durationMs
+        ? `${Math.round(session.durationMs / 1000)}s`
+        : "unknown";
     const cost = session.costUsd !== undefined ? `$${session.costUsd.toFixed(2)}` : "unknown";
     if (markdown) {
         return `${statusIcon} **Session Complete**\n- **Name:** ${session.name}\n- **State:** ${session.state}\n- **Duration:** ${duration}\n- **Cost:** ${cost}\n- **Branch:** \`${session.worktreeBranch ?? "n/a"}\``;
     }
     return `${statusIcon} Session Complete\n- Name: ${session.name}\n- State: ${session.state}\n- Duration: ${duration}\n- Cost: ${cost}\n- Branch: ${session.worktreeBranch ?? "n/a"}`;
 }
+/**
+ * Format aggregate agent stats for display.
+ */
 export function formatStats(stats, markdown = true) {
     const durationSeconds = Math.round(stats.totalDurationMs / 1000);
     const durationMin = Math.floor(durationSeconds / 60);
