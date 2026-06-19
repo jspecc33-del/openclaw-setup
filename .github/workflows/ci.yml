@@ -37,6 +37,12 @@ jobs:
       - name: Install dependencies
         run: npm install --ignore-scripts
 
+      - name: Audit dependencies
+        # Non-blocking: known findings are transitive deps of the `openclaw`
+        # peerDependency, which this repo doesn't control or pin.
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
       - name: Type check
         run: npx tsc --noEmit
 
