@@ -3,7 +3,7 @@
 // Spec: Section 7.1
 // ============================================================================
 
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 import fs from "fs";
 import path from "path";
 import os from "os";
@@ -44,15 +44,17 @@ export class WorktreeIsolation {
   }
 
   /**
-   * Execute a git command via execSync with error handling.
+   * Execute a git command via execFileSync (argument array — no shell interpretation).
    */
   private execGit(workdir: string, args: string[]): string {
-    const cmd = `git -C "${workdir}" ${args.join(" ")}`;
     try {
-      return execSync(cmd, { encoding: "utf-8", stdio: ["pipe", "pipe", "pipe"] }).trim();
+      return execFileSync("git", ["-C", workdir, ...args], {
+        encoding: "utf-8",
+        stdio: ["pipe", "pipe", "pipe"],
+      }).trim();
     } catch (err: any) {
       const stderr = err.stderr?.toString() || "";
-      throw new Error(`Git command failed: ${cmd}\n${stderr}`);
+      throw new Error(`Git command failed: git -C "${workdir}" ${args.join(" ")}\n${stderr}`);
     }
   }
 
@@ -64,7 +66,7 @@ export class WorktreeIsolation {
       const gitDir = path.join(workdir, ".git");
       if (fs.existsSync(gitDir)) return true;
       // Also check via git command (handles worktrees / submodules)
-      execSync(`git -C "${workdir}" rev-parse --git-dir`, {
+      execFileSync("git", ["-C", workdir, "rev-parse", "--git-dir"], {
         encoding: "utf-8",
         stdio: "pipe",
       });
@@ -79,7 +81,7 @@ export class WorktreeIsolation {
    */
   hasGhCli(): boolean {
     try {
-      execSync("gh --version", { encoding: "utf-8", stdio: "pipe" });
+      execFileSync("gh", ["--version"], { encoding: "utf-8", stdio: "pipe" });
       return true;
     } catch {
       return false;
@@ -145,7 +147,7 @@ export class WorktreeIsolation {
     // Resolve the branch name from the worktree
     let branch: string | undefined;
     try {
-      branch = execSync(`git -C "${worktreePath}" branch --show-current`, {
+      branch = execFileSync("git", ["-C", worktreePath, "branch", "--show-current"], {
         encoding: "utf-8",
         stdio: "pipe",
       }).trim();
@@ -176,7 +178,7 @@ export class WorktreeIsolation {
       } else {
         // Fallback: try direct removal
         try {
-          execSync(`git worktree remove -f "${worktreePath}"`, {
+          execFileSync("git", ["worktree", "remove", "-f", worktreePath], {
             encoding: "utf-8",
             stdio: "pipe",
           });
@@ -186,7 +188,7 @@ export class WorktreeIsolation {
         }
         if (branch) {
           try {
-            execSync(`git branch -D "${branch}"`, { encoding: "utf-8", stdio: "pipe" });
+            execFileSync("git", ["branch", "-D", branch], { encoding: "utf-8", stdio: "pipe" });
           } catch {
             // Branch may already be gone
           }

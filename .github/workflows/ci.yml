@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "openclaw-code-agent/**"
+      - ".github/workflows/ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "openclaw-code-agent/**"
+      - ".github/workflows/ci.yml"
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: openclaw-code-agent
+
+jobs:
+  build:
+    name: Type check & build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+
+      - name: Audit dependencies
+        # Non-blocking: known findings are transitive deps of the `openclaw`
+        # peerDependency, which this repo doesn't control or pin.
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+      - name: Check for shell-injection regressions
+        run: npm run check:no-shell-exec
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+      - name: Verify committed dist/ is up to date
+        run: |
+          if ! git diff --quiet -- dist; then
+            echo "::error::dist/ is out of date with src/. Run 'npm run build' and commit the result."
+            git diff --stat -- dist
+            exit 1
+          fi

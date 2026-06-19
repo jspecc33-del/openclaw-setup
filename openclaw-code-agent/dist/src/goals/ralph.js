@@ -1,6 +1,15 @@
 // =============================================================================
 // Goals — Ralph Engine
 // =============================================================================
+// RalphGoal implements a "signal-hunting" loop: it launches a coding session,
+// periodically checks the session output for a completion signal string
+// (e.g. "DONE"), and marks the goal complete when the signal is found.
+//
+//  * signal found    → mark goal completed
+//  * not found       → continue session, schedule next check
+//  * maxIterations   → mark goal failed
+//
+// Section 9.2 of the specification.
 import { GoalEngine } from "./base";
 export class RalphGoal extends GoalEngine {
     lifecycle;
@@ -12,17 +21,33 @@ export class RalphGoal extends GoalEngine {
         this.lifecycle = lifecycle;
         this.store = store;
     }
+    /**
+     * Launch a coding session with the goal instructions, then begin polling
+     * the output buffer for the completion signal.
+     */
     async start(task) {
         this.task = task;
         this._status = "running";
-        const session = await this.lifecycle.launch({ name: task.name, workdir: task.workdir, instructions: task.target });
+        const session = await this.lifecycle.launch({
+            name: task.name,
+            workdir: task.workdir,
+            instructions: task.target,
+        });
         task.sessionId = session.id;
         this.store.update(session.id, { goalTaskId: task.id, state: "active" });
         this.iterationTimer = setTimeout(() => this.iterate(), this.iterationDelayMs);
     }
+    /**
+     * One iteration of the Ralph loop:
+     * 1. Fetch buffered output from the session.
+     * 2. Search for the completion signal.
+     * 3. Update goal state accordingly.
+     */
     async iterate() {
-        if (!this.task || this._status !== "running") return;
+        if (!this.task || this._status !== "running")
+            return;
         const task = this.task;
+        // Guard: max iterations
         if (task.currentIteration >= task.maxIterations) {
             this._status = "failed";
             task.state = "failed";
@@ -31,10 +56,12 @@ export class RalphGoal extends GoalEngine {
             await this.lifecycle.kill(task.sessionId, "max_iterations_reached");
             return;
         }
+        // Read the latest output from the session buffer
         const output = this.store.getOutput(task.sessionId);
         task.lastOutput = output;
         task.currentIteration += 1;
         task.updatedAt = new Date().toISOString();
+        // Check for the completion signal in the buffered output
         if (task.completionSignal && output.includes(task.completionSignal)) {
             this._status = "completed";
             task.state = "completed";
@@ -42,10 +69,17 @@ export class RalphGoal extends GoalEngine {
             await this.lifecycle.kill(task.sessionId, "goal_completed");
             return;
         }
+        // Signal not found yet — schedule another check
         this.iterationTimer = setTimeout(() => this.iterate(), this.iterationDelayMs);
     }
+    /**
+     * Stop the goal engine and kill the underlying session.
+     */
     async stop() {
-        if (this.iterationTimer) { clearTimeout(this.iterationTimer); this.iterationTimer = undefined; }
+        if (this.iterationTimer) {
+            clearTimeout(this.iterationTimer);
+            this.iterationTimer = undefined;
+        }
         this._status = "stopped";
         if (this.task) {
             this.task.state = "stopped";

@@ -30,7 +30,7 @@ export declare class WorktreeFollowThrough {
     private isolation;
     constructor();
     /**
-     * Execute a git command via execSync with error handling.
+     * Execute a git command via execFileSync (argument array — no shell interpretation).
      */
     private execGit;
     /**

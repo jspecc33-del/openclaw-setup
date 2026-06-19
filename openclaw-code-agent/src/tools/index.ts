@@ -10,7 +10,7 @@
 // Section 10 of the specification.
 
 import { randomUUID } from "node:crypto";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import type {
   JSONSchema,
   ToolContext,
@@ -282,12 +282,12 @@ const agentMerge = {
     }
 
     try {
-      execSync(`git checkout ${session.baseBranch}`, { cwd: session.workdir });
-      const mergeOutput = execSync(`git merge ${session.worktreeBranch} --no-edit`, {
+      execFileSync("git", ["checkout", session.baseBranch], { cwd: session.workdir });
+      const mergeOutput = execFileSync("git", ["merge", session.worktreeBranch, "--no-edit"], {
         cwd: session.workdir,
         encoding: "utf-8",
       });
-      const sha = execSync("git rev-parse HEAD", { cwd: session.workdir, encoding: "utf-8" }).trim();
+      const sha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: session.workdir, encoding: "utf-8" }).trim();
       ctx.store.update(args.sessionId, { worktreeState: "merged" });
       return { success: true, message: mergeOutput.trim(), sha };
     } catch (err: any) {
@@ -322,11 +322,13 @@ const agentPr = {
 
     try {
       const title = args.title ?? session.name;
-      const bodyFlag = args.body ? `--body "${args.body}"` : "--fill";
-      const output = execSync(
-        `gh pr create --head "${session.worktreeBranch}" --title "${title}" ${bodyFlag}`,
-        { cwd: session.workdir, encoding: "utf-8" }
-      );
+      const ghArgs = ["pr", "create", "--head", session.worktreeBranch, "--title", title];
+      if (args.body) {
+        ghArgs.push("--body", args.body);
+      } else {
+        ghArgs.push("--fill");
+      }
+      const output = execFileSync("gh", ghArgs, { cwd: session.workdir, encoding: "utf-8" });
       const prUrl = output.trim();
       ctx.store.update(args.sessionId, { prUrl, worktreeState: "pr_open" });
       return { success: true, prUrl, message: `PR created: ${prUrl}` };
@@ -414,8 +416,8 @@ const agentWorktreeCleanup = {
       for (const s of sessions) {
         if (s.worktreeBranch && s.worktreePath) {
           try {
-            execSync(`git worktree remove "${s.worktreePath}" --force`, { cwd: s.workdir });
-            execSync(`git branch -D "${s.worktreeBranch}"`, { cwd: s.workdir });
+            execFileSync("git", ["worktree", "remove", s.worktreePath, "--force"], { cwd: s.workdir });
+            execFileSync("git", ["branch", "-D", s.worktreeBranch], { cwd: s.workdir });
             cleaned.push(s.worktreeBranch);
           } catch {
             // Best-effort cleanup

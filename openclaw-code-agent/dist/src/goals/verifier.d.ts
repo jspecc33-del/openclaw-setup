@@ -7,6 +7,7 @@ export declare class VerifierGoal extends GoalEngine {
     private store;
     private iterationTimer?;
     private iterationDelayMs;
+    private sessionWorkdir?;
     constructor(lifecycle: SessionLifecycle, store: SessionStore);
     /**
      * Launch a coding session for the goal task, then enter the iterate loop.
@@ -15,7 +16,7 @@ export declare class VerifierGoal extends GoalEngine {
     /**
      * One iteration of the verifier loop:
      * 1. Read the latest buffered output from the session.
-     * 2. Run the verifier command in the working directory.
+     * 2. Run the verifier command in the session's working directory.
      * 3. Interpret the exit code and update goal state.
      */
     iterate(): Promise<void>;
