@@ -43,6 +43,9 @@ jobs:
         run: npm audit --audit-level=high
         continue-on-error: true
 
+      - name: Check for shell-injection regressions
+        run: npm run check:no-shell-exec
+
       - name: Type check
         run: npx tsc --noEmit
 

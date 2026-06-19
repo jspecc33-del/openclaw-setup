@@ -6,7 +6,8 @@
   "main": "dist/plugin.js",
   "scripts": {
     "build": "tsc",
-    "watch": "tsc --watch"
+    "watch": "tsc --watch",
+    "check:no-shell-exec": "node scripts/check-no-shell-exec.mjs"
   },
   "peerDependencies": {
     "openclaw": ">=2026.4.21"

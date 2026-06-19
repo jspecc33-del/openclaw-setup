@@ -14,13 +14,15 @@ This repo has two unrelated parts:
 All commands run from `openclaw-code-agent/`:
 
 ```bash
-npm install --ignore-scripts   # install devDependencies (typescript, @types/node)
-npm run build                  # tsc — compiles src/ + vendor/ to dist/
-npm run watch                  # tsc --watch
-npx tsc --noEmit                # type-check only, no output (fastest correctness check)
+npm install --ignore-scripts     # install devDependencies (typescript, @types/node)
+npm run build                    # tsc — compiles src/ + vendor/ to dist/
+npm run watch                    # tsc --watch
+npx tsc --noEmit                 # type-check only, no output (fastest correctness check)
+npm run check:no-shell-exec      # regression guard: fails if execSync(string) appears outside goals/verifier.ts
 ```
 
-There is no test suite or lint config yet — `tsc --noEmit` is the verification gate for changes.
+There is no test suite or lint config yet — `tsc --noEmit` plus
+`check:no-shell-exec` are the verification gates for changes (both run in CI).
 
 `dist/` is **committed to git** (it's the runtime artifact OpenClaw loads via `manifest.json`'s `entry: dist/src/plugin.js`). After editing `src/`, run `npm run build` and commit the updated `dist/` output alongside the source change.
 

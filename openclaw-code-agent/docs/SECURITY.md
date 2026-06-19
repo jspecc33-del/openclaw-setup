@@ -70,6 +70,27 @@ The plugin operates within these constraints:
 
 ---
 
+## No-Shell Guarantee for Subprocess Calls
+
+All git/gh subprocess invocations use `execFileSync(file, argsArray, opts)`
+(or `spawn(executable, argsArray, opts)`), never `execSync(string, opts)`.
+Passing an argument array bypasses shell interpretation entirely, so
+interpolated values — branch names, worktree paths, agent-supplied PR
+titles/bodies — can never be parsed as shell metacharacters (backticks,
+`$()`, `;`, etc.), even when those values originate from session
+instructions or harness output.
+
+The one intentional exception is `goals/verifier.ts`'s
+`execSync(task.verifierCommand!, ...)`: an operator-configured shell command
+for `goal_launch` verifier goals (not derived from agent/session input),
+run with a 60s timeout.
+
+This invariant is enforced in CI via `npm run check:no-shell-exec`
+(`scripts/check-no-shell-exec.mjs`), which fails the build if any
+`execSync(` call appears outside that one allowed file.
+
+---
+
 ## Claude Code `execPolicy`
 
 `harnesses.claudeCode.execPolicy` controls how the Claude Code harness
